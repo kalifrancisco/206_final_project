@@ -4,42 +4,7 @@ import sqlite3
 from bs4 import BeautifulSoup 
 from requests import get, auth
 from pprint import pprint
-import math
-
-
-# new API - using spotify && seatgeek apis:
-    # client id: 6705c311c104b0f9032a0eb1ddd47d8
-    # client secret: ff9e3ae8497b466199206d5aa2c637b1
-
-
-# proj idea:
-    # --> use Seatgeek api to get concert data for maybe give time period in a specific location
-    # --> use Setlist api to get set list of given performers
-    # --> [extra - maybe]: use Spotify api to generate playlist based on setlist
-
-    # DATA REQUIREMENTS:
-        # 1) Store at least 100 items (rows) in at least one table per API/website
-        # 2) At least 1 API/website must have 2 tables (databases?) that share an integer key
-        # 3) At least one database join used when selecting the data
-        # 4) use SELECT from tables to calculate something
-
-
-# SEATGEEK INFO:
-    # client_id = "MjY1NDE4Mzd8MTY4MTk1NDUwMC44MDkzOTk2"
-    # client_secret = "8e4c9d4ebe18b3fb44fe5b6c1c55c0993ac1efa46f92c0fc78520440a5c114af"
-
-
-# all TODO:
-    # 1) PLAN for seatgeek db
-    # set geo location to get 100 items
-    # store in first database
-        # determine which integer key it should share w/ second data base TODO: (location_name will corresp with dist from train data)
-    # plan for second database:
-        # determine shared integer key
-    # determine calcualtions
-    # make visualizations
-
-# this will be fine
+from math import radians, sin, cos, sqrt, asin
 
 
 def get_seatgeek_data(postal_code, mi_range, start_date, end_date):
@@ -47,9 +12,11 @@ def get_seatgeek_data(postal_code, mi_range, start_date, end_date):
     CLIENT_ID = "MjY1NDE4Mzd8MTY4MTk1NDUwMC44MDkzOTk2"
     APP_SECRET = "8e4c9d4ebe18b3fb44fe5b6c1c55c0993ac1efa46f92c0fc78520440a5c114af"
     ENDPOINT = "events"
+
     url = f"https://api.seatgeek.com/2/{ENDPOINT}"
 
     # Define URL parameters here
+
     params = {
         'client_id': CLIENT_ID,
         'client_secret': APP_SECRET,
@@ -57,24 +24,20 @@ def get_seatgeek_data(postal_code, mi_range, start_date, end_date):
         'range': mi_range,
         'datetime_utc.gte': start_date,
         'datetime_utc.lte': end_date,
-        'per_page': 100 
-
+        'per_page': 100
     }
 
     resp = get(url=url, params=params)
     raw_data_dct = resp.json()
-
     event_lst = []
 
-    # pprint(raw_data_dct)
-
-    # pprint(raw_data_dct["events"])
-
-    # print("test dcts\n")
     for event in raw_data_dct["events"]:
         event_lst.append(event)
 
     return event_lst
+
+
+
 
 
 def create_seatgeek_db(event_lst):
@@ -89,48 +52,69 @@ def create_seatgeek_db(event_lst):
                  (performer, event_type, venue, latitude, longitude)''')
 
     # Loop through each event in the list and insert data into the table
+    count = 0
+    # print(len(event_lst))
+
     for event in event_lst:
-        #print(event)
+
+        if count == 25:
+            break
 
         performer_name = event['performers'][0]['name']
-
         event_type = event['type']
         if '_' in event_type:
             event_type = event_type.replace('_', ' ')
-
         location_name = event["venue"]["name"]
 
         # log percise location data for transit api
         lat = event["venue"]["location"]["lat"]
         lon = event["venue"]["location"]["lon"]
 
-        # insert data into table
-        c.execute("INSERT INTO seatgeek_events VALUES (?, ?, ?, ?, ?)", (performer_name, event_type, location_name, lat, lon))
+        c.execute("SELECT * FROM seatgeek_events WHERE performer=? AND event_type=? AND venue=?", 
+                  (performer_name, event_type, location_name))
+        result = c.fetchone()
+
+
+        if result is not None:
+            # data already exists, skip insertion
+            # print("NOT INPUTTING:" + str(result))
+            continue
+        else:
+            # insert data into table
+            # print("INSERTING!!")
+            # print(count)
+            c.execute("INSERT INTO seatgeek_events VALUES (?, ?, ?, ?, ?)", (performer_name, event_type, location_name, lat, lon))
+            count += 1
+
+    #c.execute('''DELETE FROM seatgeek_events WHERE rowid NOT IN 
+
+    #             (SELECT min(rowid) FROM seatgeek_events GROUP BY performer, event_type, venue, latitude, longitude)''')
 
     conn.commit()
     conn.close()
 
 
-def nearest_stop(api_key):
-
+def nearest_stop(api_key):  
     endpoint = 'https://api.transit.land/api/v1/stops'
 
     TRANSPORT_API_PARAMS = {
         "per_page": 100
     }
-    
+
     conn = sqlite3.connect('seatgeek_events.db')
     c = conn.cursor()
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS transportation_data
                  (stop_name TEXT, lat_cord INTEGER, lon_cord INTEGER, wheelchair_access TEXT, venue_name TEXT)''')
-    
     c.execute("SELECT performer, event_type, venue, latitude, longitude FROM seatgeek_events")
     rows = c.fetchall()
 
-    stops_count = 0
+    stops_count = 1
 
     for row in rows:
+        if stops_count > 100:
+            break
+
         venue_name = row[2]
         lat = row[3]
         lon = row[4]
@@ -143,35 +127,92 @@ def nearest_stop(api_key):
             'api_key': api_key
         }
 
-        while stops_count < 100:
-            headers = {"Api-Key": api_key}
-            resp = requests.get(endpoint, headers=headers, params=params)
+        headers = {"Api-Key": api_key}
+        resp = requests.get(endpoint, headers=headers, params=params)
+        #print(resp.json())
 
+        if resp.status_code == 401:
+            print("Invalid API key")
+        elif resp.status_code == 429:
+            print("Rate limit exceeded")
+
+        # move to next page of data in transit API
+        if 'meta' in resp.json():
             if 'next' in resp.json()['meta']:
                 resp = requests.get(resp.json()['meta']['next'], headers=headers)
                 data = resp.json()
-            else:
-                break
-
-            for stop in data["stops"]:
-                data_cords = stop["geometry"]["coordinates"]
-                lat_c = data_cords[1]
-                lon_c = data_cords[0]
-                stop_name = stop['name']
-                wheelchair = stop["wheelchair_boarding"]
-
-                c.execute("INSERT INTO transportation_data VALUES (?, ?, ?, ?, ?)", (stop_name, lat_c, lon_c, str(wheelchair), str(venue_name)))
-
-                stops_count += 1
-                # print("check sc2 ", stops_count)
-
-            params['per_page'] = 100  # set per_page to 100 for subsequent requests
-
-        if stops_count > 100:
+        else:
             break
+
+        for stop in data["stops"]:
+            data_cords = stop["geometry"]["coordinates"]
+            lat_c = data_cords[1]
+            lon_c = data_cords[0]
+            stop_name = stop['name']
+            wheelchair = stop["wheelchair_boarding"]
+            # print(stop_name, lat_c, lon_c, str(wheelchair), str(venue_name)) # debug
+
+            c.execute("INSERT INTO transportation_data VALUES (?, ?, ?, ?, ?)", (stop_name, lat_c, lon_c, str(wheelchair), str(venue_name)))
+            conn.commit()
+            break 
+
+        stops_count += 1
+        params['per_page'] = 1
 
     conn.commit()
     conn.close()
+
+
+# integrate closest resturant rec based on lat/lon of stop:
+def generate_food_recs(api_key, budget, la, lo):
+    ep = 'https://api.yelp.com/v3/businesses/search'
+    yelp_lst = []
+
+    headers = {'Authorization': f'Bearer {api_key}'}
+    params = {
+        'term': 'restaurant',
+        'latitude': la,
+        'longitude': lo,
+        'radius': 1000,
+        'price': budget,
+        'sort_by': 'rating',
+        'limit': 1
+    }
+
+    response = requests.get(ep, headers=headers, params=params)
+    yelp_data = response.json()
+    rest_name = yelp_data["businesses"][0]["name"]
+    lat = yelp_data["businesses"][0]["coordinates"]["latitude"]
+    lon = yelp_data["businesses"][0]["coordinates"]["longitude"]
+
+    yelp_lst.append(rest_name)
+    yelp_lst.append(lat)
+    yelp_lst.append(lon)
+
+    return yelp_lst
+
+
+def add_distance_column(lat1, lon1, lat2, lon2):
+     # use haversine formula to convert euclidian distance between 2 cords into miles
+     
+    r = 3959 # rad of Earth
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    return r * c
+
+
+# OLD DIST:
+# def add_distance_column(one, two, three, four):
+#      # use haversine formula to convert euclidian distance between 2 cords into miles
+     
+#     first = [one, two]
+#     second = [three, four]
+#     distance = math.dist(first, second)
+#     return distance
+
 
 
 def join_databases():
@@ -183,16 +224,19 @@ def join_databases():
 
     # Create new table to store our combined data
     c1.execute('''CREATE TABLE IF NOT EXISTS joined_data
-                 (performer TEXT, event_type TEXT, venue TEXT, latitude INTEGER, longitude INTEGER, stop_name TEXT, lat_cord INTEGER, lon_cord INTEGER, wheelchair_access TEXT)''')
+
+                 (performer TEXT, event_type TEXT, venue TEXT, latitude INTEGER, longitude INTEGER, stop_name TEXT, lat_cord INTEGER, lon_cord INTEGER, wheelchair_access TEXT, transit_distance INTEGER, restaurant_name INTEGER, restaurant_distance INTEGER)''')
+
 
     # if venue_name and venue are equal, store data together
-    c1.execute('''SELECT seatgeek_events.performer, seatgeek_events.event_type, seatgeek_events.venue, seatgeek_events.latitude, seatgeek_events.longitude, transportation_data.stop_name, transportation_data.lat_cord, transportation_data.lon_cord, transportation_data.wheelchair_access
+    c1.execute('''SELECT seatgeek_events.performer, seatgeek_events.event_type, seatgeek_events.venue, seatgeek_events.latitude, seatgeek_events.longitude, transportation_data.stop_name, transportation_data.lat_cord, transportation_data.lon_cord, transportation_data.wheelchair_access, COUNT(*) as count
                   FROM seatgeek_events 
                   JOIN transportation_data 
-                  ON seatgeek_events.venue = transportation_data.venue_name''')
+                  ON seatgeek_events.venue = transportation_data.venue_name
+                  GROUP BY seatgeek_events.venue
+                  HAVING count = 1''')
 
     rows = c1.fetchall()
-
     # loop through data and insert it into new table
     for row in rows:
         performer = row[0]
@@ -204,88 +248,40 @@ def join_databases():
         lat_cord = row[6]
         lon_cord = row[7]
         wheelchair_access = row[8]
+        transit_distance = add_distance_column(latitude, longitude, lat_cord, lon_cord)
 
-        c1.execute("INSERT INTO joined_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (performer, event_type, venue, latitude, longitude, stop_name, lat_cord, lon_cord, wheelchair_access))
+        # YELP FUSION API ADDITION:
+        yelp_lst = generate_food_recs('WRRtreepKK6FHXb9IHVirJ0ZolgQVE0xopdBsZAqNznG0LJ5i16faQGUEpBLzX2tLKj2oQstYbkbzre5HjXFU5xE2cwCmpY1pwnxJtASd1FbynJnnYxu_sJD7q5BZHYx', 2, lat_cord, lon_cord)
+        rest_name = yelp_lst[0]
+        rest_lat = yelp_lst[1]
+        rest_lon = yelp_lst[2]
+        rest_distance = add_distance_column(latitude, longitude, rest_lat, rest_lon)
 
-    conn1.commit()
+        c1.execute("INSERT INTO joined_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (performer, event_type, venue, latitude, longitude, stop_name, lat_cord, lon_cord, wheelchair_access, transit_distance, rest_name, rest_distance))
+
+        conn1.commit()
+
     conn1.close()
     conn2.close()
-
-
-
-def add_distance_column():
-
-    conn = sqlite3.connect('joined_data.db')
-    c = conn.cursor()
-
-    # add new "distance" column to table
-    c.execute("ALTER TABLE joined_data ADD COLUMN distance REAL")
-
-    # access lat and long of both stop and venue
-    c.execute("SELECT latitude, longitude, lat_cord, lon_cord FROM joined_data")
-    rows = c.fetchall()
-
-    for row in rows:
-        
-        #print(row)
-        first = [row[0], row[1]]
-        second = [row[2], row[3]]
-
-        # calculate distance btwn points
-        print(math.dist(first, second))
-
-        distance = math.dist(first, second)
-
-        # input distance into database
-        c.execute("UPDATE joined_data SET distance = ? WHERE latitude = ? AND longitude = ?", (distance, row[0], row[1]))
-        
-    conn.commit()
-    conn.close()
 
 # write distance calculations for each venue to a new text file
 def write_to_file():
     f = open("distance_calculations.txt", "w")
-
-    conn = sqlite3.connect('joined_data.db')
+    conn = sqlite3.connect('seatgeek_events.db')
     c = conn.cursor()
 
-    c.execute("SELECT venue, stop_name, distance FROM joined_data")
+    c.execute("SELECT venue, stop_name, transit_distance, restaurant_name, restaurant_distance FROM joined_data")
     rows = c.fetchall()
 
-    f.write("Venue", "Name of Stop", "Distance (in degrees)")
-    for row in rows:
-        f.write("Name of Venue: " + str(row[0]) + ", Name of Stop: " + str(row[1]) + ", Distance between: " + str(row[2]))
-    
-    f.close()
+    f.write("Venue, Name of Stop, Transit Distance (mi), Nearest Restaurant, Restaurant Distance (mi) \n")
 
+    for row in rows:
+        f.write("Name of Venue: " + str(row[0]) + ", Name of Stop: " + str(row[1]) + ", Distance between: " + str(row[2]) + ", Restaurant Name: " + str(row[3]) + ", Distance Between Stop & Restaurant: " + str(row[4]) + "\n")
+
+    f.close()
     return
 
-
-# integrate closest resturant rec based on lat/lon of stop:
-def generate_food_recs(api_key, budget):
-    ep = 'https://api.yelp.com/v3/businesses/search'
-
-    headers = {'Authorization': f'Bearer {api_key}'}
-    params = {
-        'term': 'restaurant',
-        'latitude': 40.73735,
-        'longitude': -73.99684,
-        'radius': 1000,
-        'price': budget,
-        'sort_by': 'rating',
-        'limit': 1
-    }
-    
-    response = requests.get(ep, headers=headers, params=params)
-    yelp_data = response.json()
-
-    return yelp_data
-    # print("try yelp\n", data)
-
-    # restaurant = data['businesses'][0]
-
 def main():
-
     # 1 - get lat + lon from seatgeek db (last two rows)
     # 2 - use that lat & lon using 'SELECT' to get lat and lon to ask transitland api about
     # 3 - add into transitland db w/ shared integer key
@@ -293,9 +289,22 @@ def main():
     # 5 - visualizations between concert location & bus stop (distance calculation)
 
     post_code = '10001'
-    mi_range = '20mi'
+    mi_range = '100mi'
     start_date = '2023-05-01'
-    end_date = '2023-08-28'
+    end_date = '2023-10-28'
+
+    '''
+    # needs to increment by 1 every time main is called
+    conn = sqlite3.connect('seatgeek_events.db')
+    c = conn.cursor()
+    # Get the size of the 'seatgeek_events' table
+    if c.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='seatgeek_events'"):
+        size = c.fetchone()[0]
+        page = size//25
+    else:
+        page = 0
+    conn.close()
+    '''
 
     # scrape seatgeek API into list of events:
     event_lst = get_seatgeek_data(post_code, mi_range, start_date, end_date)
@@ -304,141 +313,20 @@ def main():
     create_seatgeek_db(event_lst)
 
     # find nearest stop of each event in database, store in new table
-    nearest_stop('VG1wXRveWMAK73IfXT2XuUXs39Uby10R')
+    nearest_stop('AUonqD9X6H88AF1NldNupUd6ZtrTOx1e')
 
     # get resturant reccomendation based on specific budget closes to transit stop:
-    print("baka")
-    generate_food_recs('WRRtreepKK6FHXb9IHVirJ0ZolgQVE0xopdBsZAqNznG0LJ5i16faQGUEpBLzX2tLKj2oQstYbkbzre5HjXFU5xE2cwCmpY1pwnxJtASd1FbynJnnYxu_sJD7q5BZHYx', 2)
+    # print("done")
+
+    # generate_foo d
 
     # join both tables
+    # calculate the distance between the transportation location and the event, add column to final  database
     join_databases()
-
-    # calculate the distance between the transportation location and the event, add column to final database
-    add_distance_column()
 
     # take distance calculation + write them to a text file
     write_to_file()
 
-
 main()
 
 
-
-
-
-
-
-# —————————————————————————————————————————————————————————
-
-# FOR LATER:
-# Setlist.fm API endpoint
-# setlistfm_url = 'https://api.setlist.fm/rest/1.0/search/setlists'
-
-# # SeatGeek API parameters
-# params = {
-#     'q': 'Artist Name',
-#     'geoip': '123.456.789.012', # User's IP address
-#     'range': '10mi', # Distance from user's location
-#     'datetime_utc.gte': '2023-05-01',
-#     'datetime_utc.lte': '2023-06-01'
-# }
-
-# # Get concert data from SeatGeek API
-# response = requests.get(seatgeek_url, params=params)
-# concert_data = response.json()
-
-# # Extract necessary data from concert data
-# artist_name = concert_data['performers'][0]['name']
-# event_name = concert_data['title']
-# date = concert_data['datetime_utc']
-# venue = concert_data['venue']['name']
-
-# # Generate search query parameter for Setlist.fm API
-# search_query = artist_name + ' ' + event_name
-# event_name = 'concert'
-# # Setlist.fm API parameters
-# setlistfm_params = {
-#     'artistName': "Nicki Minaj",
-#     'p': 1, # Page number
-#     'sort': 'relevance'
-# }
-
-# # Get setlist URL from Setlist.fm API
-# setlist_fm_key = 'EvHhTr21yVmugWONkSNWnRqpD4SJKZOSd3o6'
-# setlistfm_response = requests.get(setlistfm_url, params=setlistfm_params, headers={'x-api-key': setlist_fm_key})
-# setlistfm_data = setlistfm_response.json()
-# setlist_url = setlistfm_data['setlist'][0]['url']
-
-# # Scrape data from setlist page using BeautifulSoup
-# setlist_page = requests.get(setlist_url)
-# setlist_soup = BeautifulSoup(setlist_page.content, 'html.parser')
-# setlist_songs = setlist_soup.find_all('div', class_='songLabel')
-
-
-
-# old create seatgeek:
-
-
-# def create_seatgeek_db(event_lst):
-#     # csv_dct = {}
-#     performer_name = ""
-#     event_type = ""
-#     location_name = ""
-#     # note: event['venue]['extended_address'] for 'Milwaukee, WI 53202'
-#     # test_lst = [] #debug
-
-#     # COLUMN IDEAS:
-#         # event-type    performers    venue location
-#     num_events = 1
-#     print("numev:\n")
-#     for event in event_lst:
-
-#         print(num_events, "\n")
-#         performer_name = event['performers'][0]['name']
-
-#         event_type = event['type']
-#         if '_' in event_type:
-#                 event_type = event_type.replace('_', ' ')
-
-#         location_name = event["venue"]["name"]
-
-#         # test_lst.append(location_name) #debug
-#         # num_events += 1 #debug
-
-
-#     # return csv_dct
-
-
-# OLD CHICAGO CTA IDEA:
-# KAL HERE:
-# tomorrow:
-    # make function that calls the train api for each venue name (need to figure out how to get that code)
-    # save that as a new table
-    # join tables w/ JOIN && SELECT
-    # create visualizations
-
-
-# def get_cta_train_data(venue_name):
-#     endpoint = "https://lapi.transitchicago.com/api/1.0/ttarrivals.aspx"
-#     key = "YOUR_API_KEY"  # Replace with your API key
-#     map_id = "YOUR_MAP_ID"  # Replace with the ID of the CTA map that covers the desired venue
-
-#     # Define API parameters here
-#     params = {
-#         "key": key,
-#         "mapid": map_id,
-#         "max": 5  # Set maximum number of train arrivals to return
-#     }
-
-#     # Make API request and extract relevant information from response
-#     response = requests.get(endpoint, params=params)
-#     train_data = []
-#     for train in response.json()["ctatt"]["eta"]:
-#         if venue_name.lower() in train["destNm"].lower():
-#             train_data.append({
-#                 "train_line": train["rt"],
-#                 "arrive_time": train["arrT"],
-#                 "distance": train["isApp"]  # Distance in train stops
-#             })
-
-#     return train_data
