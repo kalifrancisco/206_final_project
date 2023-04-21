@@ -1,0 +1,24 @@
+Venue, Name of Stop, Transit Distance (mi), Nearest Restaurant, Restaurant Distance (mi) 
+Name of Venue: Ambassador Theatre, Name of Stop: 50 St, Distance between: 0.06710760223674438, Restaurant Name: Hold Fast Kitchen & Spirits, Distance Between Stop & Restaurant: 0.2774969541202578
+Name of Venue: Astor Place Theatre, Name of Stop: 14th Street, Distance between: 0.5479441959277565, Restaurant Name: ME Chicken Rice, Distance Between Stop & Restaurant: 0.4119653220809459
+Name of Venue: Brooklyn Made, Name of Stop: Metropolitan Av, Distance between: 0.5027899316422781, Restaurant Name: Taste of Heaven, Distance Between Stop & Restaurant: 1.0120783852004551
+Name of Venue: Brooklyn Steel, Name of Stop: Graham Av, Distance between: 0.4327808634251342, Restaurant Name: Taste of Heaven, Distance Between Stop & Restaurant: 0.18423848228542894
+Name of Venue: Citi Field, Name of Stop: 111 St, Distance between: 0.5898861198677003, Restaurant Name: Leo's Latticini Mama's, Distance Between Stop & Restaurant: 1.0219333990324564
+Name of Venue: Gramercy Theatre, Name of Stop: 23rd Street, Distance between: 0.6182108632384241, Restaurant Name: 5ive Spice, Distance Between Stop & Restaurant: 0.2138302749888687
+Name of Venue: Greenwich Village Comedy Club, Name of Stop: 9th Street, Distance between: 0.33569284146902933, Restaurant Name: ME Chicken Rice, Distance Between Stop & Restaurant: 0.06853248621839177
+Name of Venue: Irving Plaza, Name of Stop: 14th Street, Distance between: 0.47320929290778424, Restaurant Name: ME Chicken Rice, Distance Between Stop & Restaurant: 0.7003637862260391
+Name of Venue: Madison Square Garden, Name of Stop: 33rd Street, Distance between: 0.3387620386805118, Restaurant Name: 5ive Spice, Distance Between Stop & Restaurant: 0.9731242402581225
+Name of Venue: Music Hall of Williamsburg, Name of Stop: Bedford Av, Distance between: 0.2834290185776035, Restaurant Name: Silver Light Tavern, Distance Between Stop & Restaurant: 0.6179581245689013
+Name of Venue: New World Stages / Stage 4, Name of Stop: 50 St, Distance between: 0.20006374818741882, Restaurant Name: Hold Fast Kitchen & Spirits, Distance Between Stop & Restaurant: 0.21026935674402536
+Name of Venue: Palladium Times Square, Name of Stop: 33rd Street, Distance between: 0.6000415405148034, Restaurant Name: 5ive Spice, Distance Between Stop & Restaurant: 1.181721758085074
+Name of Venue: Paramount Theatre - Huntington, Name of Stop: Fairview Street, Distance between: 0.0927465814732266, Restaurant Name: Thai Thai Villa, Distance Between Stop & Restaurant: 0.07964685985125786
+Name of Venue: Prudential Center, Name of Stop: Newark, Distance between: 0.42642453072971925, Restaurant Name: Urban Vegan, Distance Between Stop & Restaurant: 0.16956921592177238
+Name of Venue: Racket NYC, Name of Stop: 23rd Street, Distance between: 0.3599543427261665, Restaurant Name: 5ive Spice, Distance Between Stop & Restaurant: 0.29720470256739423
+Name of Venue: Sherman Theater, Name of Stop: West Main St Wawa, Distance between: 0.5243784270038778, Restaurant Name: Angel's Cafe & Catering, Distance Between Stop & Restaurant: 0.3651614716403887
+Name of Venue: St. James Theatre, Name of Stop: 33rd Street, Distance between: 0.6149088462310206, Restaurant Name: 5ive Spice, Distance Between Stop & Restaurant: 1.2293086430347315
+Name of Venue: Tarrytown Music Hall, Name of Stop: S BROADWAY @ LEROY AVE, Distance between: 0.4915140461531401, Restaurant Name: Bibille, Distance Between Stop & Restaurant: 0.02566086353507184
+Name of Venue: The Fillmore Philadelphia, Name of Stop: Frankford Av & Delaware Av - FS, Distance between: 0.04854244938871501, Restaurant Name: Primary Plant Based, Distance Between Stop & Restaurant: 0.3203512912163096
+Name of Venue: The Foundry, Name of Stop: Frankford Av & Delaware Av - FS, Distance between: 0.04854244938871501, Restaurant Name: Primary Plant Based, Distance Between Stop & Restaurant: 0.3203512912163096
+Name of Venue: Theatre of Living Arts, Name of Stop: Locust St & 8th St, Distance between: 0.4941788333515498, Restaurant Name: Sakartvelo, Distance Between Stop & Restaurant: 0.6040822644710099
+Name of Venue: Webster Hall, Name of Stop: 14th Street, Distance between: 0.5541463867072344, Restaurant Name: ME Chicken Rice, Distance Between Stop & Restaurant: 0.595867996552098
+Name of Venue: Wells Fargo Center, Name of Stop: Broad St & Pattison Av, Distance between: 0.3284466446868578, Restaurant Name: Shake Shack, Distance Between Stop & Restaurant: 0.28845969903820956
