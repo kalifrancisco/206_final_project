@@ -49,7 +49,7 @@ def create_seatgeek_db(event_lst):
 
     # Create a table to store the data
     c.execute('''CREATE TABLE IF NOT EXISTS seatgeek_events
-                 (performer, event_type, venue, latitude, longitude)''')
+                 (performer, venue, latitude, longitude)''')
 
     # Loop through each event in the list and insert data into the table
     count = 0
@@ -61,17 +61,21 @@ def create_seatgeek_db(event_lst):
             break
 
         performer_name = event['performers'][0]['name']
+        '''
         event_type = event['type']
         if '_' in event_type:
             event_type = event_type.replace('_', ' ')
-        location_name = event["venue"]["name"]
+        
+        '''
 
+        location_name = event["venue"]["name"]
+        
         # log percise location data for transit api
         lat = event["venue"]["location"]["lat"]
         lon = event["venue"]["location"]["lon"]
 
-        c.execute("SELECT * FROM seatgeek_events WHERE performer=? AND event_type=? AND venue=?", 
-                  (performer_name, event_type, location_name))
+        c.execute("SELECT * FROM seatgeek_events WHERE performer=? AND venue=?", 
+                  (performer_name, location_name))
         result = c.fetchone()
 
 
@@ -83,7 +87,7 @@ def create_seatgeek_db(event_lst):
             # insert data into table
             # print("INSERTING!!")
             # print(count)
-            c.execute("INSERT INTO seatgeek_events VALUES (?, ?, ?, ?, ?)", (performer_name, event_type, location_name, lat, lon))
+            c.execute("INSERT INTO seatgeek_events VALUES (?, ?, ?, ?)", (performer_name, location_name, lat, lon))
             count += 1
 
     #c.execute('''DELETE FROM seatgeek_events WHERE rowid NOT IN 
@@ -106,7 +110,7 @@ def nearest_stop(api_key):
 
     c.execute('''CREATE TABLE IF NOT EXISTS transportation_data
                  (stop_name TEXT, lat_cord INTEGER, lon_cord INTEGER, wheelchair_access TEXT, venue_name TEXT)''')
-    c.execute("SELECT performer, event_type, venue, latitude, longitude FROM seatgeek_events")
+    c.execute("SELECT performer, venue, latitude, longitude FROM seatgeek_events")
     rows = c.fetchall()
 
     stops_count = 1
@@ -115,9 +119,9 @@ def nearest_stop(api_key):
         if stops_count > 100:
             break
 
-        venue_name = row[2]
-        lat = row[3]
-        lon = row[4]
+        venue_name = row[1]
+        lat = row[2]
+        lon = row[3]
 
         params = {
             'lat': lat,
@@ -141,8 +145,8 @@ def nearest_stop(api_key):
             if 'next' in resp.json()['meta']:
                 resp = requests.get(resp.json()['meta']['next'], headers=headers)
                 data = resp.json()
-        else:
-            break
+            else:
+                break
 
         for stop in data["stops"]:
             data_cords = stop["geometry"]["coordinates"]
@@ -204,17 +208,6 @@ def add_distance_column(lat1, lon1, lat2, lon2):
     return r * c
 
 
-# OLD DIST:
-# def add_distance_column(one, two, three, four):
-#      # use haversine formula to convert euclidian distance between 2 cords into miles
-     
-#     first = [one, two]
-#     second = [three, four]
-#     distance = math.dist(first, second)
-#     return distance
-
-
-
 def join_databases():
 
     conn1 = sqlite3.connect('seatgeek_events.db')
@@ -225,11 +218,11 @@ def join_databases():
     # Create new table to store our combined data
     c1.execute('''CREATE TABLE IF NOT EXISTS joined_data
 
-                 (performer TEXT, event_type TEXT, venue TEXT, latitude INTEGER, longitude INTEGER, stop_name TEXT, lat_cord INTEGER, lon_cord INTEGER, wheelchair_access TEXT, transit_distance INTEGER, restaurant_name INTEGER, restaurant_distance INTEGER)''')
+                 (performer TEXT, venue TEXT, latitude INTEGER, longitude INTEGER, stop_name TEXT, lat_cord INTEGER, lon_cord INTEGER, wheelchair_access TEXT, transit_distance INTEGER, restaurant_name INTEGER, restaurant_distance INTEGER)''')
 
 
     # if venue_name and venue are equal, store data together
-    c1.execute('''SELECT seatgeek_events.performer, seatgeek_events.event_type, seatgeek_events.venue, seatgeek_events.latitude, seatgeek_events.longitude, transportation_data.stop_name, transportation_data.lat_cord, transportation_data.lon_cord, transportation_data.wheelchair_access, COUNT(*) as count
+    c1.execute('''SELECT seatgeek_events.performer, seatgeek_events.venue, seatgeek_events.latitude, seatgeek_events.longitude, transportation_data.stop_name, transportation_data.lat_cord, transportation_data.lon_cord, transportation_data.wheelchair_access, COUNT(*) as count
                   FROM seatgeek_events 
                   JOIN transportation_data 
                   ON seatgeek_events.venue = transportation_data.venue_name
@@ -240,14 +233,14 @@ def join_databases():
     # loop through data and insert it into new table
     for row in rows:
         performer = row[0]
-        event_type = row[1]
-        venue = row[2]
-        latitude = row[3]
-        longitude = row[4]
-        stop_name = row[5]
-        lat_cord = row[6]
-        lon_cord = row[7]
-        wheelchair_access = row[8]
+        # event_type = row[1]
+        venue = row[1]
+        latitude = row[2]
+        longitude = row[3]
+        stop_name = row[4]
+        lat_cord = row[5]
+        lon_cord = row[6]
+        wheelchair_access = row[7]
         transit_distance = add_distance_column(latitude, longitude, lat_cord, lon_cord)
 
         # YELP FUSION API ADDITION:
@@ -257,7 +250,7 @@ def join_databases():
         rest_lon = yelp_lst[2]
         rest_distance = add_distance_column(latitude, longitude, rest_lat, rest_lon)
 
-        c1.execute("INSERT INTO joined_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (performer, event_type, venue, latitude, longitude, stop_name, lat_cord, lon_cord, wheelchair_access, transit_distance, rest_name, rest_distance))
+        c1.execute("INSERT INTO joined_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (performer, venue, latitude, longitude, stop_name, lat_cord, lon_cord, wheelchair_access, transit_distance, rest_name, rest_distance))
 
         conn1.commit()
 
