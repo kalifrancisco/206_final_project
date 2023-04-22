@@ -7,13 +7,16 @@ import re
 import csv
 import os
 import sqlite3
+from math import radians, cos, sin, sqrt, asin
+import matplotlib.colors as mcolors
+
 
 # create dictionary
 def big_dict():
     conn = sqlite3.connect('seatgeek_events.db')
     c = conn.cursor()
 
-    c.execute("SELECT venue, distance, event_type, wheelchair_access, performer FROM joined_data")
+    c.execute("SELECT venue, transit_distance, wheelchair_access, performer FROM joined_data")
     rows = c.fetchall()
     #print(rows)
 
@@ -23,11 +26,11 @@ def big_dict():
         #print(row)
         venue = row[0]
         dist = row[1]
-        event_type = row[2]
-        wheelchair = row[3]
-        performer = row[4]
+        # event_type = row[2]
+        wheelchair = row[2]
+        performer = row[3]
 
-        dct[performer] = {"Venue": venue, "Distance": dist, "Event Type": event_type, "Wheelchair Access": wheelchair}
+        dct[performer] = {"Venue": venue, "Distance": dist, "Wheelchair Access": wheelchair}
 
     return dct
 
@@ -113,91 +116,75 @@ def visual_2(newdct):
     plt.savefig("first-visual")
 
 
+def rest_dict_1():
 
-# visualization 3: average distance by event type, bar graph
-
-def visual_3():
-    # create new dictionary, event type as key, total distance as value
     conn = sqlite3.connect('seatgeek_events.db')
-    cur = conn.cursor()
-    info = cur.execute("SELECT distance, event_type FROM joined_data")
-    rows = info.fetchall()
+    c = conn.cursor()
+    c.execute("SELECT stop_name, transit_distance, restaurant_distance FROM joined_data")
 
-    event_type_dct = {} 
-
+    rows = c.fetchall()
+    #print(rows)
+    dct = {}
+    # create dict w/ venue and distance from nearest resturant from transit stop
     for row in rows:
-        if row[1] in event_type_dct.keys():
-            event_type_dct[row[1]]["Total Distance"] += row[0]
-            event_type_dct[row[1]]["Total Num"] += 1
-        else:
-            event_type_dct[row[1]] = {"Total Distance": row[0], "Total Num": 1}
-
-        for key in event_type_dct.keys():
-            avg_distance = event_type_dct[key]["Total Distance"] / event_type_dct[key]["Total Num"]
-            event_type_dct[key]["Average Distance"] = avg_distance
-
-    # print(event_type_dct)
-
-    # NOW CREATE VISUALIZATION HERE USING THIS DICT
-
-    keylst = []
-    avgdistance = []
-
-    for key in event_type_dct.keys():
-        keylst.append(key)
-        avgdistance.append(event_type_dct[key]["Average Distance"])
+        #print(row)
+        stop = row[0]
+        t_dist = row[1]
+        r_dist = row[2]
+        dct[stop] = {"Distance from nearest restaurant": abs(t_dist - r_dist)}
+    return dct
 
 
-    first_font = {'family':'monospace','color':'black','size':10}
-    second_font = {'family':'sans-serif','color':'gray','size':9}
-    third_font = {'family':'sans-serif','color':'gray','size':9}
+def vis_3():
+    data_dict = rest_dict_1()
 
-    plt.figure(figsize=(10,5))
-    plt.bar(keylst, avgdistance, color=['red', 'orange', 'yellow'])
-    plt.xlabel('Type of Show', fontdict=second_font)
-    plt.ylabel('Average Distance (in degrees)', fontdict=third_font)
-    plt.title('Average Distance to Public Transportation by Performance Type', fontdict=first_font)
+    # Extract the stop names and distances from the data_dict
+    stops = list(data_dict.keys())
+    distances = [data_dict[stop]["Distance from nearest restaurant"] for stop in stops]
+
+    stops, distances = zip(*sorted(zip(stops, distances), key=lambda x: x[1]))
+
+    fig, ax = plt.subplots()
+
+    colors = ['teal' if dist < 500 else 'darkslategray' for dist in distances] 
+    ax.barh(stops, distances, color=colors)  # set colors
+    ax.set_xlabel('Distance from 10 Closest Transit Stops to Nearest Restaurant', fontdict={'family':'monospace','color':'black','size':10})
+    ax.set_ylabel('Transit Stop', fontdict={'family':'monospace','color':'black','size':10})
+    ax.set_title('Distance from 10 Closest Transit Stops to Nearest Restaurant by Transit Stop', fontdict={'family':'monospace','color':'black','size':12})
+
+
     plt.show()
-    plt.savefig("first-visual")
 
-    return
-
-
-
-def visual_4():
+def rest_dict_all():
     conn = sqlite3.connect('seatgeek_events.db')
-    cur = conn.cursor()
-    info = cur.execute("SELECT distance, event_type FROM joined_data")
-    rows = info.fetchall()
-    
-    event_type_dct = {} 
+    c = conn.cursor()
+    c.execute("SELECT stop_name, transit_distance, restaurant_distance FROM joined_data")
 
+    rows = c.fetchall()
+    dct = {}
     for row in rows:
-        if row[1] in event_type_dct.keys():
-            event_type_dct[row[1]]["Total Distance"] += row[0]
-            event_type_dct[row[1]]["Total Num"] += 1
-        else:
-            event_type_dct[row[1]] = {"Total Distance": row[0], "Total Num": 1}
+        stop = row[0]
+        t_dist = row[1]
+        r_dist = row[2]
+        dct[stop] = {"Distance from nearest restaurant": abs(t_dist - r_dist)}
+    return dct
 
-        for key in event_type_dct.keys():
-            avg_distance = event_type_dct[key]["Total Distance"] / event_type_dct[key]["Total Num"]
-            event_type_dct[key]["Average Distance"] = avg_distance
+def vis_4():
 
-    keylst = []
-    totaldistance = []
 
-    for key in event_type_dct.keys():
-        keylst.append(key)
-        totaldistance.append(event_type_dct[key]["Total Distance"])
+    data_dict = rest_dict_all()
 
-    first_font = {'family':'monospace','color':'black','size':15}
-    second_font = {'family':'sans-serif','color':'gray','size':3}
+    stops = list(data_dict.keys())
+    distances = [data_dict[stop]["Distance from nearest restaurant"] for stop in stops]
 
-    plt.figure(figsize=(10,10))
-    plt.title('Total Distance to different Types of Performances in NYC', fontdict=first_font)
-    plt.xlabel('Type of Performance', fontdict=second_font)
-    plt.pie(totaldistance, labels = keylst)
-    plt.show() 
+    fig, ax = plt.subplots()
+    colors = ['#DEA5A4' if dist < 500 else 'darkslategray' for dist in distances]
+    ax.scatter(distances, stops, color=colors, alpha=0.8)
+    ax.set_xlabel('Distance from 10 Closest Transit Stops to Nearest Restaurant', fontdict={'family':'monospace','color':'black','size':10})
+    ax.set_ylabel('Transit Stop', fontdict={'family':'monospace','color':'black','size':10})
+    ax.set_title('Distance from Transit Stops to Nearest Restaurant', fontdict={'family':'monospace','color':'black','size':12})
+
+    plt.show()
 
 
 def main():
@@ -205,7 +192,10 @@ def main():
     dct = big_dict()
     visual_1(dct)
     visual_2(dct)
-    visual_3()
-    visual_4()
+    # visual_3()
+    # visual_4()
+
+    vis_3()
+    vis_4()
 
 main()
